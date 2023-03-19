@@ -1,0 +1,44 @@
+stages:
+  - deploy
+
+variables:
+  DOCKER_REGISTRY: $DOCKER_REGISTRY
+  APP_NAME_DEV: 5runway-dev
+  DOCKERFILE_PATH_DEV: ./Dockerfile
+  S3_ENV_PATH_DEV: s3://5runway-env-development/.env
+  REPOSITORY_URL_DEV: $DOCKER_REGISTRY/$APP_NAME
+  TASK_DEFINITION_NAME_DEV: develop
+  IMAGE_TAG: latest
+  DOCKER_HOST: tcp://thedockerhost:2375/
+
+.deploy_template: &deploy_template
+  stage: deploy
+  image: 
+    name: amazon/aws-cli:latest
+    entrypoint: [""]
+  services:
+    - name: docker:dind
+      alias: thedockerhost
+  before_script:
+    - aws s3 cp $S3_ENV_PATH ./
+    - amazon-linux-extras install docker
+    - docker --version
+  script:
+    - docker build -f ${DOCKERFILE_PATH} -t $REPOSITORY_URL:$IMAGE_TAG . 
+    - aws ecr get-login-password | docker login --username AWS --password-stdin $DOCKER_REGISTRY
+    - docker push $DOCKER_REGISTRY/$APP_NAME:latest
+    - echo $REPOSITORY_URL:$IMAGE_TAG
+
+
+## ===== DEVELOPMENT =====
+deploy_development:
+  <<: *deploy_template
+  only:
+    - development
+  variables:
+    APP_NAME: $APP_NAME_DEV
+    DOCKERFILE_PATH: $DOCKERFILE_PATH_DEV
+    S3_ENV_PATH: $S3_ENV_PATH_DEV
+    CLUSTER_NAME: $CLUSTER_NAME_DEV
+    SERVICE_NAME: $SERVICE_NAME_DEV
+    REPOSITORY_URL: $REPOSITORY_URL_DEV
